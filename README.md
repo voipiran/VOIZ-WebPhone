@@ -3,7 +3,7 @@ A fully featured browser based WebRTC SIP phone for Asterisk
 
 # Installation
 ```
-sudo git clone https://github.com/voipiran/VOIZ-WebPhone /tmp/VOIZ-WebPhone && sudo mv /tmp/VOIZ-WebPhone/Phone /var/www/html/phone && sudo bash /var/www/html/phone/install.sh
+sudo git clone https://github.com/voipiran/VOIZ-WebPhone /tmp/VOIZ-WebPhone && sudo mv /tmp/VOIZ-WebPhone/Phone /var/www/html/phone && sudo bash /tmp/VOIZ-WebPhone/install.sh
 ```
 
 ### Description
