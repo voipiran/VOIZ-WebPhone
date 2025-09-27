@@ -3,7 +3,7 @@
 <module> 
   <menulist> 
 
-	<menuitem menuid="phone" desc="Web Phone"
+	<menuitem menuid="phone" desc="وب فون"
 parent="agenda" module="no" link="phone/" order="61"> 
       <permissions> 
         <group id="1" name="administrator" desc="total access"></group> 
