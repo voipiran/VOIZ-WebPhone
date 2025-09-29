@@ -73,7 +73,7 @@ let wallpaperLight = getDbItem("wallpaperLight", "wallpaper.light.webp");  // Wa
 let wallpaperDark = getDbItem("wallpaperDark", "wallpaper.dark.webp");     // Wallpaper for Dark Theme
 
 /**
- * 
+ * VOIPIRAN
  * User Settings & Defaults
  * Note: Generally you don't really need to be changing these settings, the defaults should be fine
  * If you want to  keep this library in its original form, but still provision settings, look at the
@@ -87,6 +87,46 @@ let ServerPath = getDbItem("ServerPath", null);         // eg: /ws
 let SipDomain = getDbItem("SipDomain", null);           // eg: raspberrypi.local
 let SipUsername = getDbItem("SipUsername", null);       // eg: webrtc
 let SipPassword = getDbItem("SipPassword", null);       // eg: webrtc
+
+
+// === AUTO REGISTER CONFIG (ADD HERE) ===
+// If you want phone.js to always use fixed credentials and auto-register,
+// set ENABLE_AUTO_REGISTER = true and fill AUTO_CONFIG below.
+const ENABLE_AUTO_REGISTER = true;
+const AUTO_CONFIG = {
+  wssServer: "192.168.2.149",
+  WebSocketPort: "8089",
+  ServerPath: "/ws",
+  SipDomain: "192.168.2.149",
+  SipUsername: "4001",
+  SipPassword: "52e86e9165660329a5ec9abb2a364a23"
+
+};
+
+if (ENABLE_AUTO_REGISTER) {
+  wssServer     = AUTO_CONFIG.wssServer;
+  WebSocketPort = AUTO_CONFIG.WebSocketPort;
+  ServerPath    = AUTO_CONFIG.ServerPath;
+  SipDomain     = AUTO_CONFIG.SipDomain;
+  SipUsername   = AUTO_CONFIG.SipUsername;
+  SipPassword   = AUTO_CONFIG.SipPassword;
+
+  console.log("phone.js: AUTO_REGISTER enabled — connection values overridden.");
+
+// الزامی‌ها را در localDB ذخیره کنیم تا UI و گارد بداند کانفیگ کامل است
+if (!profileName) profileName = "VOIZ User";
+localDB.setItem("profileName",   profileName);
+localDB.setItem("wssServer",     wssServer);
+localDB.setItem("WebSocketPort", WebSocketPort);
+localDB.setItem("ServerPath",    ServerPath);
+localDB.setItem("SipDomain",     SipDomain);
+localDB.setItem("SipUsername",   SipUsername);
+localDB.setItem("SipPassword",   SipPassword);
+
+
+}
+
+//
 
 let SingleInstance = (getDbItem("SingleInstance", "1") == "1");      // Un-registers this account if the phone is opened in another tab/window
 
@@ -1765,6 +1805,24 @@ function InitUi(){
     if(typeof web_hook_on_init !== 'undefined') web_hook_on_init();
 
     CreateUserAgent();
+
+//VOIPIRAN Close License Popup
+	// Auto-accept Welcome/License modal if present (dev convenience)
+setTimeout(function () {
+  try {
+    var modals = document.querySelectorAll('.modal, .modal.show, .modal.in');
+    if (modals && modals.length) {
+      var acceptBtn = Array.from(document.querySelectorAll('button, a'))
+        .find(function (el) { return /accept/i.test(el.textContent || ''); });
+      if (acceptBtn) acceptBtn.click();
+      // احتیاط: اگر هنوز باز بود، فورس‌-کلوز
+      Array.from(document.querySelectorAll('.modal-backdrop')).forEach(function (el){ el.remove(); });
+      document.body.classList.remove('modal-open');
+    }
+  } catch (e) { console.log("auto-accept welcome failed:", e); }
+}, 600);
+
+	
 }
 function ShowMyProfileMenu(obj){
     var enabledHtml = " <i class=\"fa fa-check\" style=\"float: right; line-height: 18px;\"></i>";
@@ -1922,10 +1980,40 @@ function PreloadAudioFiles(){
     // console.log(audioBlobs);
 }
 
+function uiLog(msg) {
+    var logDiv = document.getElementById("uiLog");
+    if (!logDiv) {
+        logDiv = document.createElement("div");
+        logDiv.id = "uiLog";
+        logDiv.style.position = "fixed";
+        logDiv.style.bottom = "0";
+        logDiv.style.left = "0";
+        logDiv.style.width = "100%";
+        logDiv.style.maxHeight = "150px";
+        logDiv.style.overflowY = "auto";
+        logDiv.style.background = "rgba(0,0,0,0.8)";
+        logDiv.style.color = "#0f0";
+        logDiv.style.fontSize = "12px";
+        logDiv.style.fontFamily = "monospace";
+        logDiv.style.zIndex = "9999";
+        document.body.appendChild(logDiv);
+    }
+    var p = document.createElement("div");
+    p.textContent = new Date().toISOString() + " - " + msg;
+    logDiv.appendChild(p);
+}
+
 // Create User Agent
 // =================
 function CreateUserAgent() {
+	
+	
     console.log("Creating User Agent...");
+	//VOIPIRAN
+	uiLog("Creating User Agent...");
+	uiLog("WS URL: wss://" + wssServer + ":" + WebSocketPort + ServerPath);
+	uiLog("SIP URI: sip:" + SipUsername + "@" + SipDomain);
+
     if(SipDomain==null || SipDomain=="" || SipDomain=="null" || SipDomain=="undefined") SipDomain = wssServer; // Sets globally
     var options = {
         logConfiguration: false,            // If true, constructor logs the registerer configuration.
