@@ -22,7 +22,7 @@ const instanceID = String(Date.now());
 const localDB = window.localStorage;
 
 // Set the following to null to disable
-let welcomeScreen = "<div class=\"UiWindowField\"><pre style=\"font-size: 12px\">";
+let welcomeScreen = null;
 welcomeScreen += "===========================================================================\n";
 welcomeScreen += "Copyright © 2020 - All Rights Reserved\n";
 welcomeScreen += "===========================================================================\n";
@@ -88,11 +88,14 @@ let SipDomain = getDbItem("SipDomain", null);           // eg: raspberrypi.local
 let SipUsername = getDbItem("SipUsername", null);       // eg: webrtc
 let SipPassword = getDbItem("SipPassword", null);       // eg: webrtc
 
-
-// === AUTO REGISTER CONFIG (ADD HERE) ===
+// === VOIPIRAN: Auto Register + persist to DB (REPLACE BLOCK) ===
 // If you want phone.js to always use fixed credentials and auto-register,
 // set ENABLE_AUTO_REGISTER = true and fill AUTO_CONFIG below.
+//VOIPIRAN
+// === VOIPIRAN: Auto Register + persist to DB + Robust Trust Helper ===
+// === VOIZIRAN: Auto Register + persist to DB + Robust Trust Helper (GLOBAL) ===
 const ENABLE_AUTO_REGISTER = true;
+
 const AUTO_CONFIG = {
   wssServer: "192.168.2.149",
   WebSocketPort: "8089",
@@ -100,7 +103,6 @@ const AUTO_CONFIG = {
   SipDomain: "192.168.2.149",
   SipUsername: "4001",
   SipPassword: "52e86e9165660329a5ec9abb2a364a23"
-
 };
 
 if (ENABLE_AUTO_REGISTER) {
@@ -111,22 +113,135 @@ if (ENABLE_AUTO_REGISTER) {
   SipUsername   = AUTO_CONFIG.SipUsername;
   SipPassword   = AUTO_CONFIG.SipPassword;
 
-  console.log("phone.js: AUTO_REGISTER enabled — connection values overridden.");
-
-// الزامی‌ها را در localDB ذخیره کنیم تا UI و گارد بداند کانفیگ کامل است
-if (!profileName) profileName = "VOIZ User";
-localDB.setItem("profileName",   profileName);
-localDB.setItem("wssServer",     wssServer);
-localDB.setItem("WebSocketPort", WebSocketPort);
-localDB.setItem("ServerPath",    ServerPath);
-localDB.setItem("SipDomain",     SipDomain);
-localDB.setItem("SipUsername",   SipUsername);
-localDB.setItem("SipPassword",   SipPassword);
-
-
+  if (!profileName || profileName === "null") profileName = "VOIZ User";
+  try {
+    localDB.setItem("profileName",   profileName);
+    localDB.setItem("wssServer",     wssServer);
+    localDB.setItem("WebSocketPort", WebSocketPort);
+    localDB.setItem("ServerPath",    ServerPath);
+    localDB.setItem("SipDomain",     SipDomain);
+    localDB.setItem("SipUsername",   SipUsername);
+    localDB.setItem("SipPassword",   SipPassword);
+  } catch (e) { console.log("AUTO_REGISTER persist failed:", e); }
+  console.log("AUTO_REGISTER set:", { wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
 }
 
-//
+// -------- Trust Helper: bind EVERYTHING to window to survive iframe scopes --------
+const AUTO_TRUST_WSS = true;
+let popupAttempted = false;
+let trustCheckerTimer = null;
+
+window.wssStatus = function () {
+  try {
+    const t = (window.userAgent && window.userAgent.transport) ? window.userAgent.transport : null;
+    const connected =
+      t && ((typeof t.isConnected === 'function' && t.isConnected()) ||
+            t.state === 'Connected' || t.state === 5);
+    return !!connected;
+  } catch (_) { return false; }
+};
+
+window.trustUrl = function () {
+  return `https://${wssServer}:${WebSocketPort}/ws`;
+};
+
+// نوار را بالای صفحه نشان بده و جا برایش باز کن
+// بنر را حتماً بالا بیاور (چه تازه بسازیم چه از قبل وجود داشته باشد)
+window.showTrustBanner = function (url) {
+  let bar = document.getElementById("wssTrustBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "wssTrustBar";
+    bar.innerHTML =
+      '<span>برای فعال‌شدن تماس‌ها باید یک‌بار به گواهی TLS سرور اعتماد کنید.</span>' +
+      '<button id="wssTrustBtn" style="margin-inline-start:12px;padding:6px 10px;border:0;border-radius:6px;background:#4caf50;color:#fff;cursor:pointer">باز کردن صفحهٔ اعتماد</button>' +
+      '<button id="wssTrustDismiss" style="margin-inline-start:8px;padding:6px 10px;border:0;border-radius:6px;background:#555;color:#fff;cursor:pointer">بستن</button>';
+    document.body.appendChild(bar);
+
+    // اکشن‌ها
+    document.getElementById("wssTrustBtn").onclick = function () {
+      const w = window.open(url, 'wssTrust', 'width=820,height=640');
+      if (!w) { alert('Popup مسدود شد. اجازهٔ popup را فعال کنید و دوباره کلیک کنید:\n' + url); return; }
+      const ti = setInterval(() => { if (w.closed) { clearInterval(ti); location.reload(); } }, 800);
+    };
+    document.getElementById("wssTrustDismiss").onclick = function () { window.hideTrustBanner(); };
+  }
+
+  // ⬅️ این بخش مهم است: چه تازه ساخته‌شده چه از قبل بوده، حتماً به بالا منتقل شود
+  const s = bar.style;
+  s.setProperty("position", "fixed", "important");
+  s.setProperty("top", "0", "important");
+  s.setProperty("bottom", "auto", "important");
+  s.setProperty("left", "0", "important");
+  s.setProperty("right", "0", "important");
+  s.setProperty("z-index", "2147483647", "important");
+  s.setProperty("background", "#111", "important");
+  s.setProperty("color", "#fff", "important");
+  s.setProperty("padding", "10px 12px", "important");
+  s.setProperty("font", "14px/1.45 sans-serif", "important");
+  s.setProperty("box-shadow", "0 2px 10px rgba(0,0,0,.35)", "important");
+
+  // جا برای نوار در بالا باز کن (اگر قبلاً حساب نشده بود)
+  const h = bar.getBoundingClientRect().height || 44;
+  if (!document.body.dataset.voizPadTop) {
+    const cur = parseInt(getComputedStyle(document.body).paddingTop || "0", 10) || 0;
+    document.body.style.paddingTop = (cur + h) + "px";
+    document.body.dataset.voizPadTop = String(h);
+  }
+
+  // هر اسکرول/کادر والد که پایین مانع دید باشد، به بالا برو
+  try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) {}
+};
+
+window.hideTrustBanner = function () {
+  const el = document.getElementById("wssTrustBar");
+  if (el) el.remove();
+  if (document.body && document.body.dataset.voizPadTop) {
+    const add = parseInt(document.body.dataset.voizPadTop || "0", 10) || 0;
+    const cur = parseInt(getComputedStyle(document.body).paddingTop || "0", 10) || 0;
+    document.body.style.paddingTop = Math.max(0, cur - add) + "px";
+    delete document.body.dataset.voizPadTop;
+  }
+};
+
+
+
+function startTrustWatcher() {
+  if (!AUTO_TRUST_WSS) return;
+  if (trustCheckerTimer) clearInterval(trustCheckerTimer);
+
+  // هر 2 ثانیه وضعیت را چک کن؛ اگر وصل نبود و بنر نداریم → بنر نشان بده
+  trustCheckerTimer = setInterval(() => {
+    if (wssStatus()) {
+      hideTrustBanner();
+      return;
+    }
+    if (!document.getElementById("wssTrustBar")) showTrustBanner();
+  }, 2000);
+}
+// === /VOIPIRAN block ===
+
+
+function showTrustBanner(url) {
+  if (document.getElementById("wssTrustBar")) return;
+  const bar = document.createElement("div");
+  bar.id = "wssTrustBar";
+  bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#111;color:#fff;padding:10px 12px;font:14px/1.4 sans-serif;box-shadow:0 -2px 8px rgba(0,0,0,.3)";
+  bar.innerHTML =
+    '<span>برای فعال شدن تماس‌ها باید یک‌بار به گواهی TLS سرور اعتماد کنید.</span>' +
+    '<button id="wssTrustBtn" style="margin-inline-start:12px;padding:6px 10px;border:0;border-radius:6px;background:#4caf50;color:#fff;cursor:pointer">باز کردن صفحهٔ اعتماد</button>' +
+    '<button id="wssTrustDismiss" style="margin-inline-start:8px;padding:6px 10px;border:0;border-radius:6px;background:#555;color:#fff;cursor:pointer">بستن</button>';
+  document.body.appendChild(bar);
+
+  document.getElementById("wssTrustBtn").addEventListener("click", function(){
+    const w = window.open(url, 'wssTrust', 'width=820,height=640');
+    if (!w) { alert('Popup مسدود شد. اجازهٔ popup را برای این سایت فعال کنید و مجدد کلیک کنید:\n' + url); return; }
+    const timer = setInterval(() => { if (w.closed) { clearInterval(timer); location.reload(); } }, 800);
+  });
+  document.getElementById("wssTrustDismiss").addEventListener("click", function(){ bar.remove(); });
+}
+// === /VOIPIRAN block ===
+
 
 let SingleInstance = (getDbItem("SingleInstance", "1") == "1");      // Un-registers this account if the phone is opened in another tab/window
 
@@ -1762,7 +1877,7 @@ function InitUi(){
     // WebRTC Error Page
     $("#WebRtcFailed").on('click', function(){
         Confirm(lang.error_connecting_web_socket, lang.web_socket_error, function(){
-            window.open("https://"+ wssServer +":"+ WebSocketPort +"/httpstatus");
+            window.open("https://"+ wssServer +":"+ WebSocketPort +"/ws");
         }, null);
     });
 
@@ -1804,23 +1919,46 @@ function InitUi(){
     // Custom Web hook
     if(typeof web_hook_on_init !== 'undefined') web_hook_on_init();
 
-    CreateUserAgent();
+	
+//VOIPIRAN
+CreateUserAgent();
 
-//VOIPIRAN Close License Popup
-	// Auto-accept Welcome/License modal if present (dev convenience)
+setTimeout(function(){ 
+  var url = 'https://' + wssServer + ':' + WebSocketPort + '/ws';
+  if (document.getElementById('wssTrustBar')) window.showTrustBanner(url); // re-style to top
+}, 300);
+
+
+// 1) بعد از 1200ms اگر هنوز وصل نیست، یک‌بار تلاش خودکار/یا بنر
 setTimeout(function () {
   try {
-    var modals = document.querySelectorAll('.modal, .modal.show, .modal.in');
-    if (modals && modals.length) {
-      var acceptBtn = Array.from(document.querySelectorAll('button, a'))
-        .find(function (el) { return /accept/i.test(el.textContent || ''); });
-      if (acceptBtn) acceptBtn.click();
-      // احتیاط: اگر هنوز باز بود، فورس‌-کلوز
-      Array.from(document.querySelectorAll('.modal-backdrop')).forEach(function (el){ el.remove(); });
-      document.body.classList.remove('modal-open');
+    if (!window.wssStatus || typeof window.wssStatus !== 'function') {
+      // Fallback مطلق: اگر حتی تابع‌ها هم لود نشدند، همین‌جا بنر بساز
+      var url = 'https://' + wssServer + ':' + WebSocketPort + '/ws';
+      (window.showTrustBanner ? window.showTrustBanner(url) : (function(){
+        var d=document.createElement('div'); d.id='wssTrustBar';
+        d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#111;color:#fff;padding:10px 12px";
+        d.innerHTML='برای اعتماد TLS این لینک را باز کنید: <a style="color:#4caf50" target="_blank" href="'+url+'">'+url+'</a>';
+        document.body.appendChild(d);
+      })());
+      return;
     }
-  } catch (e) { console.log("auto-accept welcome failed:", e); }
-}, 600);
+    if (!window.wssStatus()) {
+      console.log('VOIZ trust: WSS not connected → run trust flow once…');
+      window.attemptTrustFlowOnce();
+    }
+  } catch (e) {
+    // اگر خطایی بود، حداقل بنر را نشان بده
+    var url = 'https://' + wssServer + ':' + WebSocketPort + '/ws';
+    window.showTrustBanner ? window.showTrustBanner(url) : null;
+  }
+}, 1200);
+
+// 2) واچر دوره‌ای
+window.startTrustWatcher && window.startTrustWatcher();
+
+
+
 
 	
 }
