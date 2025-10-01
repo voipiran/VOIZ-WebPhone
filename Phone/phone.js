@@ -95,7 +95,7 @@ let SipPassword = getDbItem("SipPassword", null);       // eg: webrtc
 // === VOIPIRAN: Auto Register + persist to DB + Robust Trust Helper ===
 // === VOIZIRAN: Auto Register + persist to DB + Robust Trust Helper (GLOBAL) ===
 const ENABLE_AUTO_REGISTER = true;
-
+/*
 const AUTO_CONFIG = {
   wssServer: "192.168.2.149",
   WebSocketPort: "8089",
@@ -104,26 +104,152 @@ const AUTO_CONFIG = {
   SipUsername: "4001",
   SipPassword: "52e86e9165660329a5ec9abb2a364a23"
 };
+*/
+//VOIPIRAN-Get Sip user secret from DB
+
+
+async function loadAutoConfig() {
+  try {
+    const response = await fetch('/phone/get_sip_config.php');
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const config = await response.json();
+    if (config.error) {
+      throw new Error(config.error);
+    }
+    return {
+      wssServer: config.wssServer || "192.168.2.149",
+      WebSocketPort: config.WebSocketPort || "8089",
+      ServerPath: config.ServerPath || "/ws",
+      SipDomain: config.SipDomain || "192.168.2.149",
+      SipUsername: config.SipUsername || "4001",
+      SipPassword: config.SipPassword || "52e86e9165660329a5ec9abb2a364a23",
+      profileName: config.profileName || "VOIZ User"
+    };
+  } catch (error) {
+    console.error("Failed to load AUTO_CONFIG from /phone/get_sip_config.php:", error);
+    // مقادیر پیش‌فرض در صورت خطا
+    return {
+      wssServer: "192.168.2.149",
+      WebSocketPort: "8089",
+      ServerPath: "/ws",
+      SipDomain: "192.168.2.149",
+      SipUsername: "4001",
+      SipPassword: "52e86e9165660329a5ec9abb2a364a23",
+      profileName: "VOIZ User"
+    };
+  }
+}
 
 if (ENABLE_AUTO_REGISTER) {
-  wssServer     = AUTO_CONFIG.wssServer;
-  WebSocketPort = AUTO_CONFIG.WebSocketPort;
-  ServerPath    = AUTO_CONFIG.ServerPath;
-  SipDomain     = AUTO_CONFIG.SipDomain;
-  SipUsername   = AUTO_CONFIG.SipUsername;
-  SipPassword   = AUTO_CONFIG.SipPassword;
+  loadAutoConfig().then(AUTO_CONFIG => {
+    wssServer = AUTO_CONFIG.wssServer;
+    WebSocketPort = AUTO_CONFIG.WebSocketPort;
+    ServerPath = AUTO_CONFIG.ServerPath;
+    SipDomain = AUTO_CONFIG.SipDomain;
+    SipUsername = AUTO_CONFIG.SipUsername;
+    SipPassword = AUTO_CONFIG.SipPassword;
+    profileName = AUTO_CONFIG.profileName || "VOIZ User";
+    try {
+      localDB.setItem("profileName", profileName);
+      localDB.setItem("wssServer", wssServer);
+      localDB.setItem("WebSocketPort", WebSocketPort);
+      localDB.setItem("ServerPath", ServerPath);
+      localDB.setItem("SipDomain", SipDomain);
+      localDB.setItem("SipUsername", SipUsername);
+      localDB.setItem("SipPassword", SipPassword);
+    } catch (e) {
+      console.log("AUTO_REGISTER persist failed:", e);
+    }
+    console.log("AUTO_REGISTER set:", { wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+  });
+}
 
-  if (!profileName || profileName === "null") profileName = "VOIZ User";
-  try {
-    localDB.setItem("profileName",   profileName);
-    localDB.setItem("wssServer",     wssServer);
-    localDB.setItem("WebSocketPort", WebSocketPort);
-    localDB.setItem("ServerPath",    ServerPath);
-    localDB.setItem("SipDomain",     SipDomain);
-    localDB.setItem("SipUsername",   SipUsername);
-    localDB.setItem("SipPassword",   SipPassword);
-  } catch (e) { console.log("AUTO_REGISTER persist failed:", e); }
-  console.log("AUTO_REGISTER set:", { wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+
+// توابع شبیه‌سازی‌شده (باید با منطق واقعی سرور جایگزین شوند)
+function getSessionUser() {
+  // شبیه‌سازی: باید از کوکی یا sessionStorage بخواند
+  return window.sessionStorage.getItem('issabel_user') || document.cookie.split('; ').find(row => row.startsWith('issabel_user='))?.split('=')[1] || '';
+}
+
+function getServerIP() {
+  // شبیه‌سازی: باید از محیط سرور یا شبکه دریافت شود
+  return window.location.hostname || '127.0.0.1';
+}
+
+async function getSQLiteSetting(key) {
+  // شبیه‌سازی: باید از دیتابیس SQLite بخواند
+  // نیاز به ماژول مثل sqlite3 در محیط سرور دارد
+  return new Promise(resolve => resolve('')); // خالی تا پیاده‌سازی واقعی
+}
+
+async function getUserExtensionFromACL(user) {
+  // شبیه‌سازی: باید از دیتابیس acl.db بخواند
+  // نیاز به ماژول مثل sqlite3 در محیط سرور دارد
+  return new Promise(resolve => resolve('')); // خالی تا پیاده‌سازی واقعی
+}
+
+async function getWebphoneData(user) {
+  // شبیه‌سازی: باید از دیتابیس MySQL (webphones) بخواند
+  // نیاز به ماژول مثل mysql2 در محیط سرور دارد
+  return new Promise(resolve => resolve({})); // خالی تا پیاده‌سازی واقعی
+}
+
+async function getSipPassword(authUser) {
+  // شبیه‌سازی: باید از دیتابیس MySQL (sip) بخواند
+  // نیاز به ماژول مثل mysql2 در محیط سرور دارد
+  return new Promise(resolve => resolve('')); // خالی تا پیاده‌سازی واقعی
+}
+
+if (ENABLE_AUTO_REGISTER) {
+  loadAutoConfig().then(AUTO_CONFIG => {
+    wssServer = AUTO_CONFIG.wssServer;
+    WebSocketPort = AUTO_CONFIG.WebSocketPort;
+    ServerPath = AUTO_CONFIG.ServerPath;
+    SipDomain = AUTO_CONFIG.SipDomain;
+    SipUsername = AUTO_CONFIG.SipUsername;
+    SipPassword = AUTO_CONFIG.SipPassword;
+    profileName = AUTO_CONFIG.profileName;
+    try {
+      localDB.setItem("profileName", profileName);
+      localDB.setItem("wssServer", wssServer);
+      localDB.setItem("WebSocketPort", WebSocketPort);
+      localDB.setItem("ServerPath", ServerPath);
+      localDB.setItem("SipDomain", SipDomain);
+      localDB.setItem("SipUsername", SipUsername);
+      localDB.setItem("SipPassword", SipPassword);
+      console.log("Stored in localStorage:", { profileName, wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+    } catch (e) {
+      console.log("AUTO_REGISTER persist failed:", e);
+    }
+    console.log("AUTO_REGISTER set:", { wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+  });
+}
+
+if (ENABLE_AUTO_REGISTER) {
+  loadAutoConfig().then(AUTO_CONFIG => {
+    wssServer = AUTO_CONFIG.wssServer;
+    WebSocketPort = AUTO_CONFIG.WebSocketPort;
+    ServerPath = AUTO_CONFIG.ServerPath;
+    SipDomain = AUTO_CONFIG.SipDomain;
+    SipUsername = AUTO_CONFIG.SipUsername;
+    SipPassword = AUTO_CONFIG.SipPassword;
+    profileName = AUTO_CONFIG.profileName || "VOIZ User";
+    try {
+      localDB.setItem("profileName", profileName);
+      localDB.setItem("wssServer", wssServer);
+      localDB.setItem("WebSocketPort", WebSocketPort);
+      localDB.setItem("ServerPath", ServerPath);
+      localDB.setItem("SipDomain", SipDomain);
+      localDB.setItem("SipUsername", SipUsername);
+      localDB.setItem("SipPassword", SipPassword);
+      console.log("Stored in localStorage:", { profileName, wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+    } catch (e) {
+      console.log("AUTO_REGISTER persist failed:", e);
+    }
+    console.log("AUTO_REGISTER set:", { wssServer, WebSocketPort, ServerPath, SipDomain, SipUsername });
+  });
 }
 
 // -------- Trust Helper: bind EVERYTHING to window to survive iframe scopes --------
